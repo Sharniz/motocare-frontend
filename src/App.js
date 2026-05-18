@@ -20,9 +20,13 @@ function MapController({ activeVehicle }) {
 }
 
 function App() {
+  // ─── LIVE CLOUD ENDPOINT CONFIGURATION ─────────────────────────────
+  const API_BASE_URL = "https://motorcare-backend-1.onrender.com/api/vehicles";
+
   const [currentTab, setCurrentTab] = useState('dashboard');
   const [activeVehicle, setActiveVehicle] = useState(null);
   const [driverLocation, setDriverLocation] = useState(null);
+  const [syncStatus, setSyncStatus] = useState('');
   
   // Data State
   const [vehicles, setVehicles] = useState(() => {
@@ -41,7 +45,7 @@ function App() {
   const [maintForm, setMaintForm] = useState({ plate: '', task: '' });
   const [newVehicle, setNewVehicle] = useState({ plate: '', currentKm: '', lastService: '' });
 
-  // Persist Data
+  // Fallback Local Persistence
   useEffect(() => { localStorage.setItem('mc_fleet', JSON.stringify(vehicles)); }, [vehicles]);
   useEffect(() => { localStorage.setItem('mc_history', JSON.stringify(history)); }, [history]);
 
@@ -54,7 +58,7 @@ function App() {
         const { latitude, longitude } = position.coords;
         setDriverLocation({ lat: latitude, lng: longitude });
 
-        // Update the location of the FIRST vehicle as an example of live tracking
+        // Update the location of the FIRST vehicle dynamically
         setVehicles(prev => prev.map((v, index) => 
           index === 0 ? { ...v, lat: latitude, lng: longitude } : v
         ));
@@ -66,34 +70,85 @@ function App() {
     return () => navigator.geolocation.clearWatch(watcher);
   }, []);
 
-  // Handlers
-  const handleAddVehicle = (e) => {
+  // ─── NETWORK SYNC HANDLERS ─────────────────────────────────────────
+  
+  const handleAddVehicle = async (e) => {
     e.preventDefault();
     if (!newVehicle.plate) return;
-    const vehicle = { 
-      ...newVehicle, 
-      currentKm: parseInt(newVehicle.currentKm), 
-      lastService: parseInt(newVehicle.lastService),
+    
+    setSyncStatus('Syncing with Cloud DB...');
+    const vehicleData = { 
+      plateNumber: newVehicle.plate,
+      ownerName: "Sacco Operator", 
+      saccoName: "Kericho Fleet Management",
+      vehicleType: "Matatu",
+      currentKm: parseInt(newVehicle.currentKm) || 0, 
+      lastService: parseInt(newVehicle.lastService) || 0,
       lat: driverLocation?.lat || -0.3689, 
       lng: driverLocation?.lng || 35.2863,
       status: 'Active' 
     };
-    setVehicles([...vehicles, vehicle]);
-    setNewVehicle({ plate: '', currentKm: '', lastService: '' });
-    setCurrentTab('dashboard');
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(vehicleData)
+      });
+
+      if (response.status === 201) {
+        const localVehicleObj = {
+          plate: vehicleData.plateNumber,
+          currentKm: vehicleData.currentKm,
+          lastService: vehicleData.lastService,
+          lat: vehicleData.lat,
+          lng: vehicleData.lng,
+          status: vehicleData.status
+        };
+        setVehicles([...vehicles, localVehicleObj]);
+        setSyncStatus('✅ Sync Successful!');
+        setNewVehicle({ plate: '', currentKm: '', lastService: '' });
+        setCurrentTab('dashboard');
+      } else {
+        setSyncStatus('❌ Backend processing error.');
+      }
+    } catch (error) {
+      console.error("Sync Error:", error);
+      setSyncStatus('⚠️ Cloud offline. Saved locally.');
+      setVehicles([...vehicles, {
+        plate: vehicleData.plateNumber, currentKm: vehicleData.currentKm, lastService: vehicleData.lastService,
+        lat: vehicleData.lat, lng: vehicleData.lng, status: 'Local-Only'
+      }]);
+    }
   };
 
-  const handleLogMaintenance = (e) => {
+  const handleLogMaintenance = async (e) => {
     e.preventDefault();
     if (!maintForm.plate) return;
+
+    setSyncStatus('Updating Maintenance Ledger...');
     const entry = { ...maintForm, date: new Date().toLocaleDateString() };
-    setHistory([entry, ...history]);
     
-    setVehicles(vehicles.map(v => 
-        v.plate === maintForm.plate ? { ...v, lastService: v.currentKm } : v
-    ));
-    setMaintForm({ plate: '', task: '' });
-    setCurrentTab('dashboard');
+    try {
+      await fetch(`${API_BASE_URL}/maintenance`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plateNumber: maintForm.plate, notes: maintForm.task })
+      });
+
+      setHistory([entry, ...history]);
+      setVehicles(vehicles.map(v => 
+          v.plate === maintForm.plate ? { ...v, lastService: v.currentKm } : v
+      ));
+      setSyncStatus('✅ Maintenance Saved to Cloud Database!');
+      setMaintForm({ plate: '', task: '' });
+      setCurrentTab('dashboard');
+    } catch (error) {
+      console.error("Maintenance Sync Failed:", error);
+      setSyncStatus('⚠️ Network failure. Logged locally.');
+      setHistory([entry, ...history]);
+      setVehicles(vehicles.map(v => v.plate === maintForm.plate ? { ...v, lastService: v.currentKm } : v));
+    }
   };
 
   const isOverdue = (v) => (v.currentKm - (v.lastService || 0)) >= 5000;
@@ -114,6 +169,8 @@ function App() {
         </div>
         <div style={statBadge}>{vehicles.length} UNITS</div>
       </div>
+
+      {syncStatus && <div style={statusBarStyle}>{syncStatus}</div>}
 
       <div style={{ flex: 1, overflowY: 'auto' }}>
         
@@ -229,5 +286,6 @@ const saveBtn = { width: '100%', padding: '15px', background: '#38bdf8', color: 
 const bottomNav = { height: '80px', background: '#0f172a', display: 'flex', borderTop: '1px solid #1e293b' };
 const navItem = (active) => ({ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: active ? '#38bdf8' : '#64748b' });
 const historyCard = { background: '#0f172a', padding: '12px', borderRadius: '12px', marginBottom: '8px', border: '1px solid #1e293b' };
+const statusBarStyle = { background: '#0284c7', color: '#fff', padding: '6px 15px', fontSize: '11px', textAlign: 'center', fontWeight: 'bold' };
 
 export default App;
