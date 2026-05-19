@@ -156,33 +156,55 @@ function App() {
     <div style={layoutStyle}>
       {/* HEADER */}
       <div style={headerStyle}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={logoCircle}>
-  const AppLogoIcon = () => (
-  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" style={{ marginRight: '10px' }}>
-    <circle cx="13" cy="9" r="7" fill="#111827" stroke="#4b5563" strokeWidth="1.5"/>
-    <path d="M11 11l4.5-3.5" stroke="#ef4444" strokeWidth="1.5" strokeLinecap="round"/>
-    <circle cx="11" cy="11" r="0.8" fill="#ef4444"/>
+    {/* MAIN APPLICATION NAVBAR LOGO */}
+<div style={{ display: 'flex', alignItems: 'center' }}>
+  
+  {/* Rounded Square Backdrop Container Matching logo.png Theme */}
+  <div style={{
+    width: '42px',
+    height: '42px',
+    backgroundColor: '#eaeaea', // Off-white/light gray matching the logo asset background
+    borderRadius: '10px',       // Clean modern rounded square shape
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: '14px',
+    flexShrink: 0,              // Prevents icon deformation on window resize
+    boxShadow: '0 2px 4px rgba(0,0,0,0.15)'
+  }}>
+    {/* Clean Vector Rendering of the Speedometer & Wrench Logo */}
+    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M3.5 14A8 8 0 1 1 18.5 17" stroke="#2c3e50" strokeWidth="2" strokeLinecap="round"/>
+      
+      <path d="M6.5 11h0.8M8 8l.6.6M12 5.5v0.8M16 8l-.6.6M17.5 11h-0.8" stroke="#34495e" strokeWidth="1.5" strokeLinecap="round"/>
+      
+      <rect x="7" y="12.5" width="9.5" height="3.5" rx="1" fill="#2c3e50"/>
+      <path d="M8.5 14.2h6.5" stroke="#ffffff" strokeWidth="0.8" strokeDasharray="1 1"/>
+      
+      <line x1="12" y1="12.5" x2="16" y2="8" stroke="#e74c3c" strokeWidth="2" strokeLinecap="round"/>
+      <circle cx="12" cy="12.5" r="1.2" fill="#e74c3c"/>
+      
+      <path d="M13 19l4.5-4.5M12 18l5.5 5.5" stroke="#2c3e50" strokeWidth="2.5" strokeLinecap="round"/>
+      <path d="M18.5 13.5c.3-.3.9-.3 1.2 0s.3.9 0 1.2l-1 1-1.2-1.2z" fill="#2c3e50"/>
+      <circle cx="14" cy="20" r="0.6" fill="#eaeaea"/>
+    </svg>
+  </div>
+
+  {/* Clean Rebranded Text Header */}
+  <h1 style={{ 
+    color: '#ffffff', 
+    fontSize: '22px', 
+    fontWeight: 'bold', 
+    margin: 0,
+    letterSpacing: '0.5px'
+  }}>
+    MAT MAINTENANCE <span style={{ color: '#38bdf8' }}>APP</span>
+  </h1>
+
+</div>
     
-    <path d="M7 15.5l-2.5 2.5M18.5 4l-3 3" stroke="#9ca3af" strokeWidth="2.5" strokeLinecap="round"/>
-    <path d="M17.5 5.5c.4-.4.4-1 0-1.4s-1-.4-1.4 0l-1.2 1.2 1.4 1.4z" fill="#9ca3af"/>
-    <path d="M6.5 16.5c-.4.4-.4 1 0 1.4s1.1.4 1.4 0l1.2-1.2-1.4-1.4z" fill="#9ca3af"/>
-    
-    <path d="M5.5 14.5h7.5c.7 0 1.3-.4 1.6-1l1-2c.2-.5.2-1.1 0-1.6L14.3 8H8.5L5.7 10.5c-.3.5-.3 1.1 0 1.6l.8 1.4c.2.4.6.7 1 .8z" fill="#ffffff" stroke="#1f2937" strokeWidth="1"/>
-    {/* Wheels */}
-    <circle cx="7.5" cy="14.5" r="1.5" fill="#374151" stroke="#ffffff" strokeWidth="0.8"/>
-    <circle cx="12.5" cy="14.5" r="1.5" fill="#374151" stroke="#ffffff" strokeWidth="0.8"/>
-    {/* Windshield */}
-    <path d="M6 11h2.5v1.5H6z" fill="#4b5563"/>
-  </svg>
-);
-          
-            
-          </div>
-          <h1 style={{ fontSize: '20px', fontWeight: '800', margin: 0, color: '#fff', letterSpacing: '0.5px' }}>
-            MAT MAINTENANCE <span style={{ color: '#38bdf8' }}>APP</span>
-          </h1>
-        </div>
+       
+  
         <div style={statBadge}>{vehicles.length} UNITS</div>
       </div>
 
