@@ -42,7 +42,7 @@ function App() {
 
   // Form States
   const [maintForm, setMaintForm] = useState({ plate: '', task: '' });
-  const [newVehicle, setNewVehicle] = useState({ plate: '', sacco: '', route: '', type: '14-Seater Matatu', currentKm: '', lastService: '' });
+  const [newVehicle, setNewVehicle] = useState({ plate: '', sacco: '', route: '', type: '14-Seater Matatu', currentKm: '', lastService: '', isExisting: false });
 
   // Fallback Local Persistence
   useEffect(() => { localStorage.setItem('mc_fleet', JSON.stringify(vehicles)); }, [vehicles]);
@@ -83,43 +83,79 @@ function App() {
       vehicleType: newVehicle.type || "Matatu",
       currentKm: parseInt(newVehicle.currentKm) || 0, 
       lastService: parseInt(newVehicle.lastService) || 0,
-      lat: driverLocation?.lat || -0.3689, 
-      lng: driverLocation?.lng || 35.2863,
-      status: 'Active' 
+      lat: newVehicle.lat || driverLocation?.lat || -0.3689, 
+      lng: newVehicle.lng || driverLocation?.lng || 35.2863,
+      status: newVehicle.status || 'Active' 
     };
 
-    try {
-      const response = await fetch(`${API_BASE_URL}/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(vehicleData)
-      });
+    if (newVehicle.isExisting) {
+      // ─── ACTION: UPDATE EXISTING RECORD ────────────────────────────
+      try {
+        console.log("Syncing update to cloud server...");
+        const response = await fetch(`${API_BASE_URL}/${newVehicle.plate}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(vehicleData)
+        });
 
-      if (response.status === 201) {
-        const localVehicleObj = {
-          plate: vehicleData.plateNumber,
-          sacco: vehicleData.saccoName,
-          route: vehicleData.route,
-          type: vehicleData.vehicleType,
-          currentKm: vehicleData.currentKm,
-          lastService: vehicleData.lastService,
-          lat: vehicleData.lat,
-          lng: vehicleData.lng,
-          status: vehicleData.status
-        };
-        setVehicles([...vehicles, localVehicleObj]);
-        setNewVehicle({ plate: '', sacco: '', route: '', type: '14-Seater Matatu', currentKm: '', lastService: '' });
-        setCurrentTab('dashboard');
+        if (response.ok) {
+          const updatedLocalList = vehicles.map(v => 
+            v.plate === newVehicle.plate ? { ...v, ...vehicleData, plate: vehicleData.plateNumber, sacco: vehicleData.saccoName, type: vehicleData.vehicleType } : v
+          );
+          setVehicles(updatedLocalList);
+          alert(`Vehicle ${newVehicle.plate} updated successfully in cloud!`);
+        }
+      } catch (error) {
+        console.error("Cloud Update Failed, performing local update fallback:", error);
+        const updatedLocalList = vehicles.map(v => 
+          v.plate === newVehicle.plate ? {
+            ...v,
+            sacco: vehicleData.saccoName,
+            route: vehicleData.route,
+            type: vehicleData.vehicleType,
+            currentKm: vehicleData.currentKm,
+            lastService: vehicleData.lastService,
+            status: 'Local-Only'
+          } : v
+        );
+        setVehicles(updatedLocalList);
       }
-    } catch (error) {
-      console.error("Sync Error:", error);
-      setVehicles([...vehicles, {
-        plate: vehicleData.plateNumber, sacco: vehicleData.saccoName, route: vehicleData.route, type: vehicleData.vehicleType,
-        currentKm: vehicleData.currentKm, lastService: vehicleData.lastService, lat: vehicleData.lat, lng: vehicleData.lng, status: 'Local-Only'
-      }]);
-      setNewVehicle({ plate: '', sacco: '', route: '', type: '14-Seater Matatu', currentKm: '', lastService: '' });
-      setCurrentTab('dashboard');
+    } else {
+      // ─── ACTION: REGISTER NEW UNIQUE RECORD ────────────────────────
+      try {
+        console.log("Posting registration to cloud server...");
+        const response = await fetch(`${API_BASE_URL}/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(vehicleData)
+        });
+
+        if (response.status === 201) {
+          const localVehicleObj = {
+            plate: vehicleData.plateNumber,
+            sacco: vehicleData.saccoName,
+            route: vehicleData.route,
+            type: vehicleData.vehicleType,
+            currentKm: vehicleData.currentKm,
+            lastService: vehicleData.lastService,
+            lat: vehicleData.lat,
+            lng: vehicleData.lng,
+            status: vehicleData.status
+          };
+          setVehicles([...vehicles, localVehicleObj]);
+        }
+      } catch (error) {
+        console.error("Sync Error on Registration, adding locally:", error);
+        setVehicles([...vehicles, {
+          plate: vehicleData.plateNumber, sacco: vehicleData.saccoName, route: vehicleData.route, type: vehicleData.vehicleType,
+          currentKm: vehicleData.currentKm, lastService: vehicleData.lastService, lat: vehicleData.lat, lng: vehicleData.lng, status: 'Local-Only'
+        }]);
+      }
     }
+
+    // Clear form layout values and reset update status mode
+    setNewVehicle({ plate: '', sacco: '', route: '', type: '14-Seater Matatu', currentKm: '', lastService: '', isExisting: false });
+    setCurrentTab('dashboard');
   };
 
   const handleLogMaintenance = async (e) => {
@@ -156,65 +192,58 @@ function App() {
     <div style={layoutStyle}>
       {/* HEADER */}
       <div style={headerStyle}>
-    {/* MAIN APPLICATION NAVBAR LOGO */}
-<div style={{ display: 'flex', alignItems: 'center' }}>
-  
-  {/* Rounded Square Backdrop Container Matching logo.png Theme */}
-  <div style={{
-    width: '42px',
-    height: '42px',
-    backgroundColor: '#eaeaea', // Off-white/light gray matching the logo asset background
-    borderRadius: '10px',       // Clean modern rounded square shape
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: '14px',
-    flexShrink: 0,              // Prevents icon deformation on window resize
-    boxShadow: '0 2px 4px rgba(0,0,0,0.15)'
-  }}>
-    {/* Clean Vector Rendering of the Speedometer & Wrench Logo */}
-    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M3.5 14A8 8 0 1 1 18.5 17" stroke="#2c3e50" strokeWidth="2" strokeLinecap="round"/>
-      
-      <path d="M6.5 11h0.8M8 8l.6.6M12 5.5v0.8M16 8l-.6.6M17.5 11h-0.8" stroke="#34495e" strokeWidth="1.5" strokeLinecap="round"/>
-      
-      <rect x="7" y="12.5" width="9.5" height="3.5" rx="1" fill="#2c3e50"/>
-      <path d="M8.5 14.2h6.5" stroke="#ffffff" strokeWidth="0.8" strokeDasharray="1 1"/>
-      
-      <line x1="12" y1="12.5" x2="16" y2="8" stroke="#e74c3c" strokeWidth="2" strokeLinecap="round"/>
-      <circle cx="12" cy="12.5" r="1.2" fill="#e74c3c"/>
-      
-      <path d="M13 19l4.5-4.5M12 18l5.5 5.5" stroke="#2c3e50" strokeWidth="2.5" strokeLinecap="round"/>
-      <path d="M18.5 13.5c.3-.3.9-.3 1.2 0s.3.9 0 1.2l-1 1-1.2-1.2z" fill="#2c3e50"/>
-      <circle cx="14" cy="20" r="0.6" fill="#eaeaea"/>
-    </svg>
-  </div>
+        {/* MAIN APPLICATION NAVBAR LOGO */}
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          
+          {/* Rounded Square Backdrop Container Matching logo.png Theme */}
+          <div style={{
+            width: '42px',
+            height: '42px',
+            backgroundColor: '#eaeaea', 
+            borderRadius: '10px',       
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginRight: '14px',
+            flexShrink: 0,              
+            boxShadow: '0 2px 4px rgba(0,0,0,0.15)'
+          }}>
+            {/* Vector Speedometer & Wrench Logo Inline */}
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M3.5 14A8 8 0 1 1 18.5 17" stroke="#2c3e50" strokeWidth="2" strokeLinecap="round"/>
+              <path d="M6.5 11h0.8M8 8l.6.6M12 5.5v0.8M16 8l-.6.6M17.5 11h-0.8" stroke="#34495e" strokeWidth="1.5" strokeLinecap="round"/>
+              <rect x="7" y="12.5" width="9.5" height="3.5" rx="1" fill="#2c3e50"/>
+              <path d="M8.5 14.2h6.5" stroke="#ffffff" strokeWidth="0.8" strokeDasharray="1 1"/>
+              <line x1="12" y1="12.5" x2="16" y2="8" stroke="#e74c3c" strokeWidth="2" strokeLinecap="round"/>
+              <circle cx="12" cy="12.5" r="1.2" fill="#e74c3c"/>
+              <path d="M13 19l4.5-4.5M12 18l5.5 5.5" stroke="#2c3e50" strokeWidth="2.5" strokeLinecap="round"/>
+              <path d="M18.5 13.5c.3-.3.9-.3 1.2 0s.3.9 0 1.2l-1 1-1.2-1.2z" fill="#2c3e50"/>
+              <circle cx="14" cy="20" r="0.6" fill="#eaeaea"/>
+            </svg>
+          </div>
 
-  {/* Clean Rebranded Text Header */}
-  <h1 style={{ 
-    color: '#ffffff', 
-    fontSize: '22px', 
-    fontWeight: 'bold', 
-    margin: 0,
-    letterSpacing: '0.5px'
-  }}>
-    MAT MAINTENANCE <span style={{ color: '#38bdf8' }}>APP</span>
-  </h1>
-
-</div>
-    
-       
-  
+          {/* Clean Rebranded Text Header */}
+          <h1 style={{ 
+            color: '#ffffff', 
+            fontSize: '22px', 
+            fontWeight: 'bold', 
+            margin: 0,
+            letterSpacing: '0.5px'
+          }}>
+            MAT MAINTENANCE <span style={{ color: '#38bdf8' }}>APP</span>
+          </h1>
+        </div>
+        
         <div style={statBadge}>{vehicles.length} UNITS</div>
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto' }}>
         
-        {/* DASHBOARD */}
+        {/* DASHBOARD PANEL */}
         {currentTab === 'dashboard' && (
           <div style={containerStyle}>
             <div style={{display: 'flex', gap: '12px', marginBottom: '35px'}}>
-               <button onClick={() => setCurrentTab('fleet')} style={actionButton('#38bdf8')}>🚐 Add Fleet</button>
+               <button onClick={() => setCurrentTab('fleet')} style={actionButton('#38bdf8')}>🚐 Add/Edit Fleet</button>
                <button onClick={() => setCurrentTab('maintenance')} style={actionButton('#f8fafc')}>🛠️ Maintenance</button>
             </div>
 
@@ -233,13 +262,24 @@ function App() {
                      {isOverdue(v) ? '⚠️ SERVICE OVERDUE' : '✅ Operational'}
                   </div>
                 </div>
-                <button onClick={() => { setActiveVehicle(v); setCurrentTab('map'); }} style={trackBtn}>VIEW MAP</button>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <button onClick={() => { setActiveVehicle(v); setCurrentTab('map'); }} style={trackBtn}>VIEW MAP</button>
+                  <button 
+                    onClick={() => { 
+                      setNewVehicle({ ...v, isExisting: true }); 
+                      setCurrentTab('fleet'); 
+                    }} 
+                    style={{ ...trackBtn, backgroundColor: '#38bdf8', color: '#0f172a' }}
+                  >
+                    EDIT ASSET
+                  </button>
+                </div>
               </div>
             ))}
           </div>
         )}
 
-        {/* MAINTENANCE FORM & HISTORY */}
+        {/* MAINTENANCE LOG PANEL */}
         {currentTab === 'maintenance' && (
           <div style={containerStyle}>
             <div style={{...formBox, border: '1px solid #38bdf8'}}>
@@ -270,30 +310,110 @@ function App() {
           </div>
         )}
 
-        {/* FLEET FORM */}
+        {/* FLEET FORM (DUAL PURPOSE LOGIC SECTION) */}
         {currentTab === 'fleet' && (
           <div style={containerStyle}>
             <div style={formBox}>
-              <h3 style={formTitle}>REGISTER VEHICLE</h3>
-              <input placeholder="Plate Number" style={inputStyle} value={newVehicle.plate} onChange={e => setNewVehicle({...newVehicle, plate: e.target.value.toUpperCase()})} />
-              <input placeholder="Sacco Name (e.g., Classic Sacco)" style={inputStyle} value={newVehicle.sacco} onChange={e => setNewVehicle({...newVehicle, sacco: e.target.value})} />
-              <input placeholder="Route Description (e.g., Kericho - Kisumu)" style={inputStyle} value={newVehicle.route} onChange={e => setNewVehicle({...newVehicle, route: e.target.value})} />
+              <h3 style={formTitle}>
+                {newVehicle.isExisting ? "UPDATE FLEET DETAILS" : "REGISTER VEHICLE"}
+              </h3>
               
-              <select style={inputStyle} value={newVehicle.type} onChange={e => setNewVehicle({...newVehicle, type: e.target.value})}>
+              <input 
+                placeholder="Plate Number" 
+                style={inputStyle} 
+                value={newVehicle.plate || ''} 
+                onChange={e => {
+                  const typedPlate = e.target.value.toUpperCase();
+                  const existingVehicle = vehicles.find(v => v.plate === typedPlate);
+                  
+                  if (existingVehicle) {
+                    setNewVehicle({
+                      ...newVehicle,
+                      plate: typedPlate,
+                      sacco: existingVehicle.sacco,
+                      route: existingVehicle.route,
+                      type: existingVehicle.type,
+                      currentKm: existingVehicle.currentKm,
+                      lastService: existingVehicle.lastService,
+                      lat: existingVehicle.lat,
+                      lng: existingVehicle.lng,
+                      status: existingVehicle.status,
+                      isExisting: true
+                    });
+                  } else {
+                    setNewVehicle({ ...newVehicle, plate: typedPlate, isExisting: false });
+                  }
+                }} 
+              />
+
+              {newVehicle.isExisting && (
+                <div style={{
+                  color: '#38bdf8',
+                  backgroundColor: '#1e293b',
+                  borderLeft: '4px solid #38bdf8',
+                  padding: '12px',
+                  borderRadius: '6px',
+                  marginBottom: '15px',
+                  fontSize: '13px',
+                  lineHeight: '1.5',
+                  textAlign: 'left'
+                }}>
+                  <strong>ℹ️ Fleet Vehicle Spotted in System</strong><br />
+                  • Sacco: {newVehicle.sacco || 'N/A'}<br />
+                  • Recorded Current Mileage: <strong style={{ color: '#10b981' }}>{newVehicle.currentKm} KM</strong><br />
+                  <em>Modifying values below will overwrite this asset's status.</em>
+                </div>
+              )}
+
+              <input 
+                placeholder="Sacco Name (e.g., Classic Sacco)" 
+                style={inputStyle} 
+                value={newVehicle.sacco || ''} 
+                onChange={e => setNewVehicle({...newVehicle, sacco: e.target.value})} 
+              />
+              
+              <input 
+                placeholder="Route Description (e.g., Kericho - Kisumu)" 
+                style={inputStyle} 
+                value={newVehicle.route || ''} 
+                onChange={e => setNewVehicle({...newVehicle, route: e.target.value})} 
+              />
+              
+              <select 
+                style={inputStyle} 
+                value={newVehicle.type || '14-Seater Matatu'} 
+                onChange={e => setNewVehicle({...newVehicle, type: e.target.value})}
+              >
                 <option value="14-Seater Matatu">14-Seater Matatu</option>
                 <option value="33-Seater Nganya">33-Seater Nganya</option>
                 <option value="7-Seater Shuttle">7-Seater Shuttle</option>
                 <option value="Other Fleet Vehicle">Other Fleet Vehicle</option>
               </select>
 
-              <input placeholder="Current KM" type="number" style={inputStyle} value={newVehicle.currentKm} onChange={e => setNewVehicle({...newVehicle, currentKm: e.target.value})} />
-              <input placeholder="Last Service KM" type="number" style={inputStyle} value={newVehicle.lastService} onChange={e => setNewVehicle({...newVehicle, lastService: e.target.value})} />
-              <button onClick={handleAddVehicle} style={saveBtn}>ADD TO SYSTEM</button>
+              <input 
+                placeholder="Current KM" 
+                type="number" 
+                style={inputStyle} 
+                value={newVehicle.currentKm || ''} 
+                onChange={e => setNewVehicle({...newVehicle, currentKm: e.target.value})} 
+              />
+              
+              <input 
+                placeholder="Last Service KM" 
+                type="number" 
+                style={inputStyle} 
+                value={newVehicle.lastService || ''} 
+                onChange={e => setNewVehicle({...newVehicle, lastService: e.target.value})} 
+              />
+              
+              <button onClick={handleAddVehicle} style={saveBtn}>
+                {newVehicle.isExisting ? "UPDATE VEHICLE DETAILS" : "ADD TO SYSTEM"}
+              </button>
             </div>
           </div>
         )}
-
-        {/* MAP VIEW */}
+                
+        {/* MAP VIEW CONTAINER */}
         {currentTab === 'map' && (
           <div style={{ height: '100%', width: '100%' }}>
             <MapContainer center={[-0.3689, 35.2863]} zoom={14} style={{ height: '100%', width: '100%' }}>
@@ -313,7 +433,7 @@ function App() {
         )}
       </div>
 
-      {/* FOOTER NAV */}
+      {/* FOOTER NAV INTERFACE */}
       <div style={bottomNav}>
         <div onClick={() => setCurrentTab('dashboard')} style={navItem(currentTab === 'dashboard')}>🏠<br/>Home</div>
         <div onClick={() => setCurrentTab('fleet')} style={navItem(currentTab === 'fleet')}>🚐<br/>Fleet</div>
@@ -324,23 +444,22 @@ function App() {
   );
 }
 
-// --- STYLING ---
+// ─── STATIC STYLING SCHEMES ─────────────────────────────────────────
 const layoutStyle = { height: '100vh', width: '100vw', background: '#020617', color: '#f8fafc', display: 'flex', flexDirection: 'column', overflow: 'hidden', fontFamily: 'Inter, sans-serif' };
 const headerStyle = { padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#0f172a', borderBottom: '1px solid #1e293b' };
-const logoCircle = { width: '40px', height: '40px', background: '#38bdf8', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0f172a' };
 const statBadge = { background: '#1e293b', padding: '5px 12px', borderRadius: '15px', fontSize: '10px', fontWeight: 'bold', color: '#38bdf8', border: '1px solid #38bdf844' };
 const containerStyle = { padding: '20px' };
 const sectionLabel = { color: '#475569', fontSize: '11px', fontWeight: 'bold', letterSpacing: '1px', marginBottom: '15px' };
 const actionButton = (color) => ({ flex: 1, background: '#0f172a', border: `1px solid ${color}`, padding: '20px 10px', borderRadius: '20px', color: '#fff', fontWeight: 'bold' });
 const normalCard = { background: '#0f172a', padding: '15px', borderRadius: '12px', marginBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid #1e293b' };
 const alertCard = { ...normalCard, borderLeft: '4px solid #38bdf8' };
-const trackBtn = { background: '#1e293b', color: '#fff', border: 'none', padding: '8px 12px', borderRadius: '6px', fontSize: '10px', fontWeight: 'bold' };
+const trackBtn = { background: '#1e293b', color: '#fff', border: 'none', padding: '8px 12px', borderRadius: '6px', fontSize: '10px', fontWeight: 'bold', cursor: 'pointer' };
 const formBox = { background: '#0f172a', padding: '20px', borderRadius: '20px' };
 const formTitle = { marginTop: 0, fontSize: '14px', color: '#38bdf8', marginBottom: '15px' };
 const inputStyle = { width: '100%', padding: '12px', background: '#020617', border: '1px solid #1e293b', color: '#fff', borderRadius: '10px', marginBottom: '10px' };
-const saveBtn = { width: '100%', padding: '15px', background: '#38bdf8', color: '#0f172a', border: 'none', borderRadius: '10px', fontWeight: 'bold' };
+const saveBtn = { width: '100%', padding: '15px', background: '#38bdf8', color: '#0f172a', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer' };
 const bottomNav = { height: '80px', background: '#0f172a', display: 'flex', borderTop: '1px solid #1e293b' };
-const navItem = (active) => ({ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: active ? '#38bdf8' : '#64748b' });
+const navItem = (active) => ({ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: active ? '#38bdf8' : '#64748b', cursor: 'pointer' });
 const historyCard = { background: '#0f172a', padding: '12px', borderRadius: '12px', marginBottom: '8px', border: '1px solid #1e293b' };
 
 export default App;
