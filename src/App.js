@@ -26,13 +26,12 @@ function App() {
   const [currentTab, setCurrentTab] = useState('dashboard');
   const [activeVehicle, setActiveVehicle] = useState(null);
   const [driverLocation, setDriverLocation] = useState(null);
-  const [syncStatus, setSyncStatus] = useState('');
   
   // Data State
   const [vehicles, setVehicles] = useState(() => {
     const saved = localStorage.getItem('mc_fleet');
     return saved ? JSON.parse(saved) : [
-      { plate: 'KCB 123X', lastService: 45000, currentKm: 51000, lat: -0.3689, lng: 35.2863, status: 'Active' }
+      { plate: 'KCB 123X', sacco: 'Classic Sacco', route: 'Kericho - Kisumu', type: '14-Seater Matatu', lastService: 45000, currentKm: 51000, lat: -0.3689, lng: 35.2863, status: 'Active' }
     ];
   });
 
@@ -43,7 +42,7 @@ function App() {
 
   // Form States
   const [maintForm, setMaintForm] = useState({ plate: '', task: '' });
-  const [newVehicle, setNewVehicle] = useState({ plate: '', currentKm: '', lastService: '' });
+  const [newVehicle, setNewVehicle] = useState({ plate: '', sacco: '', route: '', type: '14-Seater Matatu', currentKm: '', lastService: '' });
 
   // Fallback Local Persistence
   useEffect(() => { localStorage.setItem('mc_fleet', JSON.stringify(vehicles)); }, [vehicles]);
@@ -76,12 +75,12 @@ function App() {
     e.preventDefault();
     if (!newVehicle.plate) return;
     
-    setSyncStatus('Syncing with Cloud DB...');
     const vehicleData = { 
       plateNumber: newVehicle.plate,
       ownerName: "Sacco Operator", 
-      saccoName: "Kericho Fleet Management",
-      vehicleType: "Matatu",
+      saccoName: newVehicle.sacco || "General Sacco",
+      route: newVehicle.route || "Local Route",
+      vehicleType: newVehicle.type || "Matatu",
       currentKm: parseInt(newVehicle.currentKm) || 0, 
       lastService: parseInt(newVehicle.lastService) || 0,
       lat: driverLocation?.lat || -0.3689, 
@@ -99,6 +98,9 @@ function App() {
       if (response.status === 201) {
         const localVehicleObj = {
           plate: vehicleData.plateNumber,
+          sacco: vehicleData.saccoName,
+          route: vehicleData.route,
+          type: vehicleData.vehicleType,
           currentKm: vehicleData.currentKm,
           lastService: vehicleData.lastService,
           lat: vehicleData.lat,
@@ -106,19 +108,17 @@ function App() {
           status: vehicleData.status
         };
         setVehicles([...vehicles, localVehicleObj]);
-        setSyncStatus('✅ Sync Successful!');
-        setNewVehicle({ plate: '', currentKm: '', lastService: '' });
+        setNewVehicle({ plate: '', sacco: '', route: '', type: '14-Seater Matatu', currentKm: '', lastService: '' });
         setCurrentTab('dashboard');
-      } else {
-        setSyncStatus('❌ Backend processing error.');
       }
     } catch (error) {
       console.error("Sync Error:", error);
-      setSyncStatus('⚠️ Cloud offline. Saved locally.');
       setVehicles([...vehicles, {
-        plate: vehicleData.plateNumber, currentKm: vehicleData.currentKm, lastService: vehicleData.lastService,
-        lat: vehicleData.lat, lng: vehicleData.lng, status: 'Local-Only'
+        plate: vehicleData.plateNumber, sacco: vehicleData.saccoName, route: vehicleData.route, type: vehicleData.vehicleType,
+        currentKm: vehicleData.currentKm, lastService: vehicleData.lastService, lat: vehicleData.lat, lng: vehicleData.lng, status: 'Local-Only'
       }]);
+      setNewVehicle({ plate: '', sacco: '', route: '', type: '14-Seater Matatu', currentKm: '', lastService: '' });
+      setCurrentTab('dashboard');
     }
   };
 
@@ -126,7 +126,6 @@ function App() {
     e.preventDefault();
     if (!maintForm.plate) return;
 
-    setSyncStatus('Updating Maintenance Ledger...');
     const entry = { ...maintForm, date: new Date().toLocaleDateString() };
     
     try {
@@ -140,14 +139,14 @@ function App() {
       setVehicles(vehicles.map(v => 
           v.plate === maintForm.plate ? { ...v, lastService: v.currentKm } : v
       ));
-      setSyncStatus('✅ Maintenance Saved to Cloud Database!');
       setMaintForm({ plate: '', task: '' });
       setCurrentTab('dashboard');
     } catch (error) {
       console.error("Maintenance Sync Failed:", error);
-      setSyncStatus('⚠️ Network failure. Logged locally.');
       setHistory([entry, ...history]);
       setVehicles(vehicles.map(v => v.plate === maintForm.plate ? { ...v, lastService: v.currentKm } : v));
+      setMaintForm({ plate: '', task: '' });
+      setCurrentTab('dashboard');
     }
   };
 
@@ -159,18 +158,21 @@ function App() {
       <div style={headerStyle}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <div style={logoCircle}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-               <rect x="3" y="7" width="18" height="10" rx="2" /><path d="M7 12h10" />
+            {/* Custom SVG: Mechanics Gear combined with a Log Checklist */}
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94.77l-6.91 6.91a2.12 2.12 0 0 0 3 3l6.91-6.91a6 6 0 0 1 .77-7.94l-3.77 3.77z" />
+              <path d="M4 14H2" />
+              <path d="M10 20v2" />
+              <path d="M4 20H2" />
+              <path d="M7 17v5" />
             </svg>
           </div>
-          <h1 style={{ fontSize: '22px', fontWeight: '800', margin: 0, color: '#fff' }}>
-            MOTOR<span style={{ color: '#38bdf8' }}>CARE</span>
+          <h1 style={{ fontSize: '20px', fontWeight: '800', margin: 0, color: '#fff', letterSpacing: '0.5px' }}>
+            MAT MAINTENANCE <span style={{ color: '#38bdf8' }}>APP</span>
           </h1>
         </div>
         <div style={statBadge}>{vehicles.length} UNITS</div>
       </div>
-
-      {syncStatus && <div style={statusBarStyle}>{syncStatus}</div>}
 
       <div style={{ flex: 1, overflowY: 'auto' }}>
         
@@ -186,8 +188,14 @@ function App() {
             {vehicles.map(v => (
               <div key={v.plate} style={isOverdue(v) ? alertCard : normalCard}>
                 <div>
-                  <div style={{fontWeight: 'bold', fontSize: '15px'}}>{v.plate}</div>
-                  <div style={{fontSize: '11px', color: isOverdue(v) ? '#38bdf8' : '#64748b', marginTop: '3px'}}>
+                  <div style={{fontWeight: 'bold', fontSize: '15px', color: '#fff'}}>{v.plate}</div>
+                  <div style={{fontSize: '12px', color: '#94a3b8', marginTop: '4px'}}>
+                    {v.sacco} • Route: {v.route}
+                  </div>
+                  <div style={{fontSize: '11px', color: '#64748b', marginTop: '2px'}}>
+                    Type: {v.type}
+                  </div>
+                  <div style={{fontSize: '11px', color: isOverdue(v) ? '#38bdf8' : '#10b981', marginTop: '6px', fontWeight: '600'}}>
                      {isOverdue(v) ? '⚠️ SERVICE OVERDUE' : '✅ Operational'}
                   </div>
                 </div>
@@ -234,6 +242,16 @@ function App() {
             <div style={formBox}>
               <h3 style={formTitle}>REGISTER VEHICLE</h3>
               <input placeholder="Plate Number" style={inputStyle} value={newVehicle.plate} onChange={e => setNewVehicle({...newVehicle, plate: e.target.value.toUpperCase()})} />
+              <input placeholder="Sacco Name (e.g., Classic Sacco)" style={inputStyle} value={newVehicle.sacco} onChange={e => setNewVehicle({...newVehicle, sacco: e.target.value})} />
+              <input placeholder="Route Description (e.g., Kericho - Kisumu)" style={inputStyle} value={newVehicle.route} onChange={e => setNewVehicle({...newVehicle, route: e.target.value})} />
+              
+              <select style={inputStyle} value={newVehicle.type} onChange={e => setNewVehicle({...newVehicle, type: e.target.value})}>
+                <option value="14-Seater Matatu">14-Seater Matatu</option>
+                <option value="33-Seater Nganya">33-Seater Nganya</option>
+                <option value="7-Seater Shuttle">7-Seater Shuttle</option>
+                <option value="Other Fleet Vehicle">Other Fleet Vehicle</option>
+              </select>
+
               <input placeholder="Current KM" type="number" style={inputStyle} value={newVehicle.currentKm} onChange={e => setNewVehicle({...newVehicle, currentKm: e.target.value})} />
               <input placeholder="Last Service KM" type="number" style={inputStyle} value={newVehicle.lastService} onChange={e => setNewVehicle({...newVehicle, lastService: e.target.value})} />
               <button onClick={handleAddVehicle} style={saveBtn}>ADD TO SYSTEM</button>
@@ -248,7 +266,11 @@ function App() {
               <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
               {vehicles.map((v, i) => (
                 <Marker key={i} position={[v.lat, v.lng]}>
-                  <Popup><b>{v.plate}</b><br/>{isOverdue(v) ? "Maintenance Due" : "Healthy"}</Popup>
+                  <Popup>
+                    <b>{v.plate}</b><br/>
+                    {v.sacco}<br/>
+                    {isOverdue(v) ? "⚠️ Maintenance Due" : "✅ Healthy"}
+                  </Popup>
                 </Marker>
               ))}
               <MapController activeVehicle={activeVehicle} />
@@ -286,6 +308,5 @@ const saveBtn = { width: '100%', padding: '15px', background: '#38bdf8', color: 
 const bottomNav = { height: '80px', background: '#0f172a', display: 'flex', borderTop: '1px solid #1e293b' };
 const navItem = (active) => ({ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: active ? '#38bdf8' : '#64748b' });
 const historyCard = { background: '#0f172a', padding: '12px', borderRadius: '12px', marginBottom: '8px', border: '1px solid #1e293b' };
-const statusBarStyle = { background: '#0284c7', color: '#fff', padding: '6px 15px', fontSize: '11px', textAlign: 'center', fontWeight: 'bold' };
 
 export default App;
